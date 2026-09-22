@@ -1,7 +1,13 @@
 from fastapi import FastAPI
 
+from backend.app.api.router import api_router
 
-app = FastAPI()
+
+app = FastAPI(
+    title="NodAgent",
+    description="AI Agent Knowledge Base System",
+    version="0.1.0",
+)
 
 
 @app.get("/")
@@ -10,8 +16,5 @@ def root():
         "message": "NodAgent is running"
     }
 
-@app.get("/health")
-def health():
-    return {
-        "status": "ok"
-    }
+
+app.include_router(api_router)
