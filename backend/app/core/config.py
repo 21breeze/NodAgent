@@ -12,22 +12,55 @@ load_dotenv(BASE_DIR / ".env")
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "15432")
+
+POSTGRES_HOST = os.getenv(
+    "POSTGRES_HOST",
+    "localhost",
+)
+
+POSTGRES_PORT = os.getenv(
+    "POSTGRES_PORT",
+    "15432",
+)
 
 
 if not POSTGRES_USER:
-    raise RuntimeError("POSTGRES_USER is not configured")
+    raise RuntimeError(
+        "POSTGRES_USER is not configured"
+    )
 
 if not POSTGRES_PASSWORD:
-    raise RuntimeError("POSTGRES_PASSWORD is not configured")
+    raise RuntimeError(
+        "POSTGRES_PASSWORD is not configured"
+    )
 
 if not POSTGRES_DB:
-    raise RuntimeError("POSTGRES_DB is not configured")
+    raise RuntimeError(
+        "POSTGRES_DB is not configured"
+    )
 
 
 DATABASE_URL = (
-    "postgresql+psycopg2://"
+    "postgresql+psycopg://"
     f"{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}"
+    f"/{POSTGRES_DB}"
+)
+
+
+OLLAMA_BASE_URL = os.getenv(
+    "OLLAMA_BASE_URL",
+    "http://localhost:11434",
+)
+
+EMBEDDING_MODEL_NAME = os.getenv(
+    "EMBEDDING_MODEL_NAME",
+    "qwen3-embedding:4b",
+)
+
+EMBEDDING_DIMENSION = int(
+    os.getenv(
+        "EMBEDDING_DIMENSION",
+        "1024",
+    )
 )

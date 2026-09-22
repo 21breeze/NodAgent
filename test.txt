@@ -1,0 +1,1 @@
+NodAgent is an AI knowledge base system. It uses FastAPI for backend development. LangChain is used for document processing. LangGraph will be used to build AI agents. PostgreSQL is used to store application data.
