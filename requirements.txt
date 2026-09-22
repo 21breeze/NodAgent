@@ -1,0 +1,14 @@
+annotated-doc==0.0.5
+annotated-types==0.7.0
+anyio==4.12.1
+click==8.1.8
+exceptiongroup==1.3.1
+fastapi==0.128.8
+h11==0.16.0
+idna==3.20
+pydantic==2.13.5
+pydantic_core==2.46.5
+starlette==0.49.3
+typing-inspection==0.4.2
+typing_extensions==4.16.0
+uvicorn==0.39.0
