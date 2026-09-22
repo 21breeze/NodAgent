@@ -8,3 +8,6 @@ __pycache__/
 .vscode/
 
 .DS_Store
+
+data/uploads/*
+!data/uploads/.gitkeep
