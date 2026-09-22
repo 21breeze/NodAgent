@@ -1,8 +1,17 @@
 from fastapi import APIRouter
 
-from backend.app.api.routes.documents import router as document_router
-from backend.app.api.routes.health import router as health_router
-from backend.app.api.routes.workspaces import router as workspace_router
+from backend.app.api.routes.documents import (
+    router as document_router,
+)
+from backend.app.api.routes.health import (
+    router as health_router,
+)
+from backend.app.api.routes.search import (
+    router as search_router,
+)
+from backend.app.api.routes.workspaces import (
+    router as workspace_router,
+)
 
 
 api_router = APIRouter(
@@ -20,4 +29,8 @@ api_router.include_router(
 
 api_router.include_router(
     document_router
+)
+
+api_router.include_router(
+    search_router
 )
