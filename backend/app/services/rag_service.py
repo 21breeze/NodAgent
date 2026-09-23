@@ -1,134 +1,181 @@
-from typing import Any
+from typing import List
 
 from langchain_core.messages import (
+    AIMessage,
     HumanMessage,
 )
+from langgraph.graph.state import (
+    CompiledStateGraph,
+)
+from sqlalchemy.orm import Session
 
 from backend.app.schemas.chat import (
     ChatResponse,
     ChatSource,
 )
+from backend.app.services import (
+    chat_history_service,
+)
 
 
-def message_to_text(
-    message,
-) -> str:
-    content = message.content
-
-    if isinstance(
-        content,
-        str,
-    ):
-        return content
-
-    text_parts = []
-
-    for block in content:
-        if isinstance(
-            block,
-            str,
-        ):
-            text_parts.append(
-                block
-            )
-
-        elif isinstance(
-            block,
-            dict,
-        ):
-            text = block.get(
-                "text"
-            )
-
-            if text:
-                text_parts.append(
-                    str(text)
-                )
-
-    return "\n".join(
-        text_parts
-    )
-
-
-async def chat_with_workspace(
-    graph: Any,
+async def chat(
+    db: Session,
+    graph: CompiledStateGraph,
+    workspace_id: int,
     user_id: str,
     thread_id: str,
-    workspace_id: int,
     message: str,
     top_k: int,
 ) -> ChatResponse:
+    thread = (
+        chat_history_service.get_thread(
+            db=db,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            thread_id=thread_id,
+        )
+    )
+
+    if thread is None:
+        raise ValueError(
+            "Chat thread not found"
+        )
+
+    chat_history_service.create_message(
+        db=db,
+        chat_thread_id=thread.id,
+        role="user",
+        content=message,
+    )
+
+    db.flush()
+
     internal_thread_id = (
-        f"user:{user_id}:"
-        f"workspace:{workspace_id}:"
-        f"thread:{thread_id}"
+        chat_history_service
+        .build_internal_thread_id(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            thread_id=thread_id,
+        )
     )
 
-    result = await graph.ainvoke(
-        {
-            "messages": [
-                HumanMessage(
-                    content=message
+    try:
+        result = await graph.ainvoke(
+            {
+                "messages": [
+                    HumanMessage(
+                        content=message
+                    )
+                ],
+                "top_k": top_k,
+            },
+            config={
+                "configurable": {
+                    "thread_id": (
+                        internal_thread_id
+                    ),
+                }
+            },
+            context={
+                "user_id": user_id,
+                "workspace_id": (
+                    workspace_id
+                ),
+            },
+        )
+
+        messages = result.get(
+            "messages",
+            [],
+        )
+
+        answer = ""
+
+        for current_message in reversed(
+            messages
+        ):
+            if isinstance(
+                current_message,
+                AIMessage,
+            ):
+                answer = str(
+                    current_message.content
                 )
-            ],
-            "top_k": top_k,
-        },
-        config={
-            "configurable": {
-                "thread_id":
-                    internal_thread_id,
-            }
-        },
-        context={
-            "user_id": user_id,
-            "workspace_id":
-                workspace_id,
-        },
-    )
+                break
 
-    answer_message = (
-        result["messages"][-1]
-    )
+        if not answer:
+            raise RuntimeError(
+                "RAG graph returned no "
+                "assistant answer"
+            )
 
-    answer = message_to_text(
-        answer_message
-    )
-
-    sources = []
-
-    for index, chunk in enumerate(
-        result.get(
+        retrieved_chunks = result.get(
             "retrieved_chunks",
             [],
-        ),
-        start=1,
-    ):
-        sources.append(
-            ChatSource(
+        )
+
+        sources: List[ChatSource] = []
+
+        source_payload = []
+
+        for index, chunk in enumerate(
+            retrieved_chunks,
+            start=1,
+        ):
+            source = ChatSource(
                 source_number=index,
-                chunk_id=(
-                    chunk["chunk_id"]
-                ),
-                document_id=(
-                    chunk["document_id"]
-                ),
-                chunk_index=(
-                    chunk["chunk_index"]
-                ),
-                content=(
-                    chunk["content"]
-                ),
-                metadata_json=(
-                    chunk["metadata_json"]
-                ),
-                distance=(
-                    chunk["distance"]
-                ),
+                chunk_id=chunk[
+                    "chunk_id"
+                ],
+                document_id=chunk[
+                    "document_id"
+                ],
+                chunk_index=chunk[
+                    "chunk_index"
+                ],
+                content=chunk["content"],
+                metadata_json=chunk[
+                    "metadata_json"
+                ],
+                distance=chunk[
+                    "distance"
+                ],
+            )
+
+            sources.append(source)
+
+            source_payload.append(
+                source.model_dump()
+            )
+
+        chat_history_service.create_message(
+            db=db,
+            chat_thread_id=thread.id,
+            role="assistant",
+            content=answer,
+            sources=source_payload,
+        )
+
+        (
+            chat_history_service
+            .update_thread_title_from_message(
+                thread=thread,
+                message=message,
             )
         )
 
-    return ChatResponse(
-        thread_id=thread_id,
-        answer=answer,
-        sources=sources,
-    )
+        chat_history_service.touch_thread(
+            thread=thread
+        )
+
+        db.commit()
+
+        return ChatResponse(
+            thread_id=thread_id,
+            answer=answer,
+            sources=sources,
+        )
+
+    except Exception:
+        db.rollback()
+        raise

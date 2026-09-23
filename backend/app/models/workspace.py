@@ -1,4 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from backend.app.db.database import Base
@@ -25,6 +30,12 @@ class Workspace(Base):
 
     documents = relationship(
         "Document",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+
+    chat_threads = relationship(
+        "ChatThread",
         back_populates="workspace",
         cascade="all, delete-orphan",
     )

@@ -1,19 +1,13 @@
-from contextlib import (
-    asynccontextmanager,
-)
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
-from backend.app.core.config import (
-    CHECKPOINT_DATABASE_URL,
-)
-
 from langgraph.checkpoint.postgres.aio import (
     AsyncPostgresSaver,
 )
 
-from backend.app.api.router import (
-    api_router,
+from backend.app.api.router import api_router
+from backend.app.core.config import (
+    CHECKPOINT_DATABASE_URL,
 )
 from backend.app.db.database import (
     Base,
@@ -22,7 +16,10 @@ from backend.app.db.database import (
 from backend.app.graphs.rag_graph import (
     build_rag_graph,
 )
+
 from backend.app.models import (
+    ChatMessage,
+    ChatThread,
     Document,
     DocumentChunk,
     Workspace,
@@ -30,21 +27,20 @@ from backend.app.models import (
 
 
 Base.metadata.create_all(
-    bind=engine
+    bind=engine,
 )
 
 
 @asynccontextmanager
-async def lifespan(
-    app: FastAPI,
-):
-    async with (
-        AsyncPostgresSaver
-        .from_conn_string(
-            CHECKPOINT_DATABASE_URL
-        )
+async def lifespan(app: FastAPI):
+    async with AsyncPostgresSaver.from_conn_string(
+        CHECKPOINT_DATABASE_URL
     ) as checkpointer:
         await checkpointer.setup()
+
+        app.state.checkpointer = (
+            checkpointer
+        )
 
         app.state.rag_graph = (
             build_rag_graph(
@@ -68,11 +64,8 @@ app = FastAPI(
 @app.get("/")
 def root():
     return {
-        "message":
-            "NodAgent is running"
+        "message": "NodAgent is running"
     }
 
 
-app.include_router(
-    api_router
-)
+app.include_router(api_router)
