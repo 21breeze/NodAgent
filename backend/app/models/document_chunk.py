@@ -8,9 +8,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from backend.app.core.config import (
-    EMBEDDING_DIMENSION,
-)
+from backend.app.core.config import EMBEDDING_DIMENSION
 from backend.app.db.database import Base
 
 
@@ -55,7 +53,7 @@ class DocumentChunk(Base):
 
     embedding = Column(
         Vector(EMBEDDING_DIMENSION),
-        nullable=True,
+        nullable=False,
     )
 
     document = relationship(

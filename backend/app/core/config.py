@@ -9,8 +9,14 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(BASE_DIR / ".env")
 
 
+# =========================
+# PostgreSQL
+# =========================
+
 POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_PASSWORD = os.getenv(
+    "POSTGRES_PASSWORD"
+)
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 
 POSTGRES_HOST = os.getenv(
@@ -42,11 +48,27 @@ if not POSTGRES_DB:
 
 DATABASE_URL = (
     "postgresql+psycopg://"
-    f"{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-    f"@{POSTGRES_HOST}:{POSTGRES_PORT}"
-    f"/{POSTGRES_DB}"
+    f"{POSTGRES_USER}:"
+    f"{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:"
+    f"{POSTGRES_PORT}/"
+    f"{POSTGRES_DB}"
 )
 
+
+CHECKPOINT_DATABASE_URL = (
+    "postgresql://"
+    f"{POSTGRES_USER}:"
+    f"{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:"
+    f"{POSTGRES_PORT}/"
+    f"{POSTGRES_DB}"
+)
+
+
+# =========================
+# Ollama Embedding
+# =========================
 
 OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
@@ -64,3 +86,37 @@ EMBEDDING_DIMENSION = int(
         "1024",
     )
 )
+
+
+# =========================
+# DeepSeek LLM
+# =========================
+
+DEEPSEEK_API_KEY = os.getenv(
+    "DEEPSEEK_API_KEY"
+)
+
+DEEPSEEK_MODEL = os.getenv(
+    "DEEPSEEK_MODEL",
+    "deepseek-flash",
+)
+
+
+if not DEEPSEEK_API_KEY:
+    raise RuntimeError(
+        "DEEPSEEK_API_KEY is not configured"
+    )
+
+
+# =========================
+# LangGraph
+# =========================
+
+LANGGRAPH_STRICT_MSGPACK = os.getenv(
+    "LANGGRAPH_STRICT_MSGPACK",
+    "true",
+)
+
+os.environ[
+    "LANGGRAPH_STRICT_MSGPACK"
+] = LANGGRAPH_STRICT_MSGPACK

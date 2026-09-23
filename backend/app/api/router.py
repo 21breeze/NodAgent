@@ -1,5 +1,8 @@
 from fastapi import APIRouter
 
+from backend.app.api.routes.chat import (
+    router as chat_router,
+)
 from backend.app.api.routes.documents import (
     router as document_router,
 )
@@ -33,4 +36,8 @@ api_router.include_router(
 
 api_router.include_router(
     search_router
+)
+
+api_router.include_router(
+    chat_router
 )
