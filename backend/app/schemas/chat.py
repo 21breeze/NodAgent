@@ -1,28 +1,16 @@
-from typing import Any, Dict, List
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Union,
+)
 
-from pydantic import BaseModel, Field
-
-
-class ChatRequest(BaseModel):
-    user_id: str = Field(
-        min_length=1,
-        max_length=100,
-    )
-
-    thread_id: str = Field(
-        min_length=1,
-        max_length=100,
-    )
-
-    message: str = Field(
-        min_length=1,
-    )
-
-    top_k: int = Field(
-        default=5,
-        ge=1,
-        le=10,
-    )
+from pydantic import (
+    BaseModel,
+    Field,
+)
 
 
 class ChatSource(BaseModel):
@@ -36,14 +24,82 @@ class ChatSource(BaseModel):
 
     content: str
 
-    metadata_json: Dict[str, Any]
+    metadata_json: Dict[
+        str,
+        Any,
+    ]
 
     distance: float
 
 
+class ChatRequest(BaseModel):
+    user_id: str
+
+    thread_id: str
+
+    message: str
+
+    top_k: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
+
+
+class ChatResumeRequest(BaseModel):
+    user_id: str
+
+    thread_id: str
+
+    decision: Literal[
+        "approve",
+        "reject",
+    ]
+
+    top_k: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
+
+
 class ChatResponse(BaseModel):
+    status: Literal[
+        "completed"
+    ] = "completed"
+
     thread_id: str
 
     answer: str
 
-    sources: List[ChatSource]
+    sources: List[
+        ChatSource
+    ] = Field(
+        default_factory=list
+    )
+
+
+class ChatInterruptResponse(BaseModel):
+    status: Literal[
+        "interrupted"
+    ] = "interrupted"
+
+    thread_id: str
+
+    interrupt_id: str
+
+    interrupt: Dict[
+        str,
+        Any,
+    ]
+
+
+ChatApiResponse = Annotated[
+    Union[
+        ChatResponse,
+        ChatInterruptResponse,
+    ],
+    Field(
+        discriminator="status"
+    ),
+]
