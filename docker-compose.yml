@@ -1,5 +1,17 @@
 services:
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: nodagent-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
   # ==================================================
   # PostgreSQL + pgvector
   # ==================================================
