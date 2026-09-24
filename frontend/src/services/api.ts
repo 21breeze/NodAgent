@@ -9,6 +9,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 }
 
 export async function responseError(response: Response): Promise<string> {
+  if (response.status === 413) return '文件过大，上传上限为 100 MB。请选择较小的文件。'
   try {
     const body = await response.json() as { detail?: string | { msg?: string }[] }
     if (typeof body.detail === 'string') return body.detail
