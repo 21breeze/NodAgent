@@ -237,7 +237,7 @@ memory
 external
 ==================================================
 
-需要获取实时外部信息时选择 external。
+需要访问外部系统或实时外部信息时选择 external。
 
 例如：
 
@@ -246,8 +246,14 @@ external
 纽约现在几点？
 东京当前时间是多少？
 
-这类信息具有实时性，
-不能依赖模型训练知识回答，
+查看 GitHub 某个 Repository。
+读取 GitHub Repository 的 README。
+查看 GitHub Issue。
+查看 GitHub Pull Request。
+读取 GitHub Repository 当前文件内容。
+
+这类问题依赖实时数据或外部系统，
+不能只依赖模型训练知识回答，
 应交给 External Agent 调用 MCP Tool。
 
 如果问题只是通用知识，

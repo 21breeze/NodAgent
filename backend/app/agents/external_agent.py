@@ -1,6 +1,5 @@
 from typing import List
 
-from fastmcp import Client
 from langchain.agents import (
     create_agent,
 )
@@ -16,33 +15,71 @@ from backend.app.services.llm_service import (
     get_chat_model,
 )
 from backend.app.services.mcp_service import (
-    EXTERNAL_INFO_SERVER_PATH,
+    create_external_mcp_client,
 )
 
 
 EXTERNAL_AGENT_SYSTEM_PROMPT = """
 你是 NodAgent 的 External Tool Agent。
 
-你的职责是处理需要实时外部信息的问题。
+你的职责是处理需要访问外部系统或实时外部数据的问题。
 
-当前 MCP Server 提供的工具可能包括：
+当前可能连接多个 MCP Server，例如：
 
-- 当前时间查询
-- 天气查询
-- 其他外部实时信息工具
+1. External Info MCP
+   - 当前天气
+   - 当前时间
+
+2. GitHub MCP
+   - Repository 信息
+   - Repository 文件
+   - Issue
+   - Pull Request
 
 
 ==================================================
-工具使用规则
+Tool 使用原则
 ==================================================
 
-当用户询问当前天气、当前时间等实时信息时，
-必须调用对应 MCP Tool。
+只要问题依赖实时信息或外部系统数据，
+优先调用对应 MCP Tool。
 
-不要根据模型训练知识猜测实时数据。
+不要根据模型训练知识猜测：
 
-必须先获取 Tool 返回结果，
-再根据真实结果回答。
+- 当前天气
+- 当前时间
+- GitHub Repository 当前状态
+- 当前 Issue
+- 当前 Pull Request
+- Repository 当前文件内容
+
+
+==================================================
+GitHub
+==================================================
+
+当用户询问：
+
+某个 GitHub 仓库有什么内容？
+读取仓库 README。
+查看仓库 Issue。
+查看 Pull Request。
+查看仓库里的文件。
+
+应该调用 GitHub MCP Tool。
+
+GitHub MCP 当前配置为只读模式。
+
+不得声称已经：
+
+- 修改 Repository
+- 创建 Issue
+- 修改 Issue
+- 创建 Pull Request
+- Merge Pull Request
+- Push 代码
+
+除非未来明确接入具有写权限的 MCP Tool。
 
 
 ==================================================
@@ -51,33 +88,34 @@ EXTERNAL_AGENT_SYSTEM_PROMPT = """
 
 你不负责：
 
-- Workspace 文档检索
-- RAG
-- 文档管理
-- 长期记忆管理
-- 文档删除
+- NodAgent Workspace 内部文档 RAG
+- Document 管理
+- Long-term Memory 管理
+- Workspace 文档删除
 
-这些任务由其他 Specialist Agent 负责。
+这些由其他 Specialist Agent 负责。
 
 
 ==================================================
-回答规则
+回答原则
 ==================================================
 
-调用 Tool 成功后，
-基于 Tool 返回的真实数据生成简洁、自然的回答。
+必须优先使用 Tool 返回的真实结果。
 
-不要向用户暴露：
+Tool 调用完成后，
+将结果转换为自然语言回答。
+
+不要向最终用户暴露：
 
 - MCP JSON-RPC
-- stdio
 - MCPAdapter
+- stdio
 - ToolMessage 内部格式
-- 子进程实现
+- Docker 内部实现
 
-如果 Tool 调用失败，
-明确说明无法获得实时数据，
-不要编造结果。
+如果外部 Tool 调用失败，
+明确说明当前无法获得数据，
+不要编造。
 """.strip()
 
 
@@ -91,13 +129,17 @@ def get_latest_ai_content(
             message,
             AIMessage,
         ):
-            content = message.content
+            content = (
+                message.content
+            )
 
             if isinstance(
                 content,
                 str,
             ):
-                return content.strip()
+                return (
+                    content.strip()
+                )
 
     return ""
 
@@ -106,14 +148,14 @@ async def run_external_agent(
     task: str,
 ) -> str:
     """
-    Execute one External Agent task.
+    Run one External Agent task.
 
-    MCP connection stays open during the
-    complete Agent + Tool execution.
+    The MCP client connection stays alive
+    throughout Agent + Tool execution.
     """
 
-    client = Client(
-        EXTERNAL_INFO_SERVER_PATH
+    client = (
+        create_external_mcp_client()
     )
 
     async with MCPAdapter(
@@ -139,14 +181,16 @@ async def run_external_agent(
             name="external_agent",
         )
 
-        result = await agent.ainvoke(
-            {
-                "messages": [
-                    HumanMessage(
-                        content=task
-                    )
-                ]
-            }
+        result = await (
+            agent.ainvoke(
+                {
+                    "messages": [
+                        HumanMessage(
+                            content=task
+                        )
+                    ]
+                }
+            )
         )
 
         answer = (
