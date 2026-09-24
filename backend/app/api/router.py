@@ -12,6 +12,9 @@ from backend.app.api.routes.documents import (
 from backend.app.api.routes.health import (
     router as health_router,
 )
+from backend.app.api.routes.memories import (
+    router as memories_router,
+)
 from backend.app.api.routes.search import (
     router as search_router,
 )
@@ -38,6 +41,10 @@ api_router.include_router(
 
 api_router.include_router(
     search_router
+)
+
+api_router.include_router(
+    memories_router
 )
 
 api_router.include_router(
