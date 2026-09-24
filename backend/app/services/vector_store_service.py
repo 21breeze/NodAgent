@@ -45,6 +45,6 @@ vector_store = PGVectorStore.create_sync(
     ),
 
     index_query_options=HNSWQueryOptions(
-        ef_search=40
+        ef_search=100
     ),
 )

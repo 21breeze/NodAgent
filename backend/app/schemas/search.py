@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,8 +24,15 @@ class SearchResult(BaseModel):
     content: str
     metadata_json: Dict[str, Any]
 
-    distance: float
-    similarity: float
+    distance: Optional[float] = None
+    similarity: Optional[float] = None
+
+    keyword_score: Optional[float] = None
+
+    vector_rank: Optional[int] = None
+    keyword_rank: Optional[int] = None
+
+    rrf_score: float
 
 
 class SearchResponse(BaseModel):

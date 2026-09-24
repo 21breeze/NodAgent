@@ -149,6 +149,21 @@ async def search_knowledge_base(
                 "distance": (
                     result.distance
                 ),
+                "similarity": (
+                    result.similarity
+                ),
+                "keyword_score": (
+                    result.keyword_score
+                ),
+                "vector_rank": (
+                    result.vector_rank
+                ),
+                "keyword_rank": (
+                    result.keyword_rank
+                ),
+                "rrf_score": (
+                    result.rrf_score
+                ),
             }
         )
 
