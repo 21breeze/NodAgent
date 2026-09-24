@@ -1,19 +1,10 @@
 import os
-import sys
 from pathlib import Path
-from typing import (
-    Any,
-    Dict,
-    List,
-)
 
 from dotenv import load_dotenv
 from fastmcp import Client
-from langchain.mcp import (
-    MCPAdapter,
-)
-from langchain_core.tools import (
-    BaseTool,
+from fastmcp.client.transports import (
+    StreamableHttpTransport,
 )
 
 
@@ -22,6 +13,7 @@ PROJECT_ROOT = (
     .resolve()
     .parents[3]
 )
+
 
 load_dotenv(
     PROJECT_ROOT / ".env"
@@ -37,121 +29,69 @@ EXTERNAL_INFO_SERVER_PATH = (
 )
 
 
-def build_external_mcp_config() -> Dict[
-    str,
-    Any,
-]:
+GITHUB_MCP_URL = os.getenv(
+    "GITHUB_MCP_URL",
+    "http://127.0.0.1:8082",
+)
+
+
+def create_external_info_client() -> Client:
     """
-    Build the MCP multi-server configuration.
+    NodAgent local MCP server.
 
-    external_info:
-        NodAgent local MCP server.
+    Development transport:
+    stdio.
+    """
 
-    github:
-        Official GitHub MCP server running
-        through Docker.
+    return Client(
+        EXTERNAL_INFO_SERVER_PATH
+    )
+
+
+def create_github_mcp_client() -> Client:
+    """
+    GitHub official MCP server.
+
+    Transport:
+    Streamable HTTP.
+
+    GitHub HTTP MCP requires the client
+    to send its GitHub access token in
+    the Authorization header.
     """
 
     github_token = os.getenv(
         "GITHUB_PERSONAL_ACCESS_TOKEN"
     )
 
-    servers: Dict[
-        str,
-        Dict[str, Any],
-    ] = {
-        "external_info": {
-            "command": sys.executable,
-            "args": [
-                str(
-                    EXTERNAL_INFO_SERVER_PATH
-                )
-            ],
-        }
-    }
-
-    if github_token:
-        servers["github"] = {
-            "command": "docker",
-
-            "args": [
-                "run",
-                "-i",
-                "--rm",
-
-                "-e",
-                (
-                    "GITHUB_PERSONAL_ACCESS_TOKEN"
-                ),
-
-                "-e",
-                "GITHUB_READ_ONLY=1",
-
-                "-e",
-                (
-                    "GITHUB_TOOLSETS="
-                    "repos,issues,"
-                    "pull_requests"
-                ),
-
-                (
-                    "ghcr.io/github/"
-                    "github-mcp-server"
-                ),
-            ],
-
-            "env": {
-                (
-                    "GITHUB_PERSONAL_ACCESS_TOKEN"
-                ): github_token,
-            },
-        }
-
-    return {
-        "mcpServers": servers
-    }
-
-
-def create_external_mcp_client() -> Client:
-    """
-    Create one aggregated FastMCP client.
-
-    It can connect to:
-
-    - NodAgent local external-info server
-    - Official GitHub MCP server
-    """
-
-    config = (
-        build_external_mcp_config()
-    )
-
-    return Client(config)
-
-
-async def list_external_tools() -> List[
-    BaseTool
-]:
-    """
-    Discover tools from every configured
-    MCP server and adapt them into
-    LangChain BaseTool objects.
-
-    This function is intended for discovery
-    and diagnostics.
-    """
-
-    client = (
-        create_external_mcp_client()
-    )
-
-    async with MCPAdapter(
-        client
-    ) as adapter:
-        tools = await (
-            adapter.list_tools(
-                cache_mode="refresh"
-            )
+    if not github_token:
+        raise RuntimeError(
+            "GITHUB_PERSONAL_ACCESS_TOKEN "
+            "is not configured."
         )
 
-        return tools
+    transport = (
+        StreamableHttpTransport(
+            url=GITHUB_MCP_URL,
+            headers={
+                "Authorization": (
+                    f"Bearer "
+                    f"{github_token}"
+                ),
+
+                "X-MCP-Readonly": (
+                    "true"
+                ),
+
+                "X-MCP-Toolsets": (
+                    "repos,"
+                    "issues,"
+                    "pull_requests"
+                ),
+            },
+        )
+    )
+
+    return Client(
+        transport=transport
+    )
