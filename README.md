@@ -905,3 +905,13 @@ EMBEDDING_DIMENSION=1024
 # GitHub MCP
 GITHUB_PERSONAL_ACCESS_TOKEN=your_githu
 ```
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+See [LICENSE](LICENSE) for details.
+
+---
