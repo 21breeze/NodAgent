@@ -44,6 +44,9 @@ from backend.app.agents.knowledge_agent import (
 from backend.app.agents.memory_agent import (
     get_memory_agent,
 )
+from backend.app.agents.external_agent import (
+    run_external_agent,
+)
 from backend.app.services import (
     document_action_service,
 )
@@ -60,6 +63,7 @@ RouteName = Literal[
     "knowledge",
     "document",
     "memory",
+    "external",
     "delete_document",
 ]
 
@@ -151,6 +155,7 @@ direct
 knowledge
 document
 memory
+external
 delete_document
 
 ==================================================
@@ -227,6 +232,27 @@ memory
 
 只要用户是在保存、更新、列出或删除长期记忆，
 必须选择 memory。
+
+==================================================
+external
+==================================================
+
+需要获取实时外部信息时选择 external。
+
+例如：
+
+东京现在天气怎么样？
+上海今天气温多少？
+纽约现在几点？
+东京当前时间是多少？
+
+这类信息具有实时性，
+不能依赖模型训练知识回答，
+应交给 External Agent 调用 MCP Tool。
+
+如果问题只是通用知识，
+不需要实时外部数据，
+选择 direct。
 
 ==================================================
 delete_document
@@ -824,6 +850,40 @@ async def memory_node(
     }
 
 
+async def external_node(
+    state: MainGraphState,
+):
+    task = state.get(
+        "specialist_task",
+        "",
+    )
+
+    if not task:
+        task = (
+            get_latest_user_message(
+                state.get(
+                    "messages",
+                    [],
+                )
+            )
+        )
+
+    answer = await (
+        run_external_agent(
+            task
+        )
+    )
+
+    return {
+        "specialist_agent": (
+            "external"
+        ),
+        "specialist_answer": answer,
+        "sources": [],
+        "documents": [],
+    }
+
+
 async def prepare_delete_node(
     state: MainGraphState,
     runtime: Runtime[
@@ -1250,6 +1310,11 @@ def build_main_graph(
     )
 
     graph.add_node(
+        "external",
+        external_node,
+    )
+
+    graph.add_node(
         "prepare_delete",
         prepare_delete_node,
     )
@@ -1292,6 +1357,10 @@ def build_main_graph(
                 "memory"
             ),
 
+            "external": (
+                "external"
+            ),
+
             "delete_document": (
                 "prepare_delete"
             ),
@@ -1310,6 +1379,11 @@ def build_main_graph(
 
     graph.add_edge(
         "memory",
+        "chat",
+    )
+
+    graph.add_edge(
+        "external",
         "chat",
     )
 
