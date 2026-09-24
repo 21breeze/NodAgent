@@ -11,3 +11,36 @@ __pycache__/
 
 data/uploads/*
 !data/uploads/.gitkeep
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime uploads
+data/uploads/*
+!data/uploads/.gitkeep
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
