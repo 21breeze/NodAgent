@@ -1,4 +1,9 @@
 services:
+
+  # ==================================================
+  # PostgreSQL + pgvector
+  # ==================================================
+
   postgres:
     image: pgvector/pgvector:pg16
 
@@ -13,9 +18,216 @@ services:
     volumes:
       - nodagent_postgres_data:/var/lib/postgresql/data
 
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    restart: unless-stopped
+
+
+  # ==================================================
+  # Redis
+  # Celery Broker + Result Backend
+  # ==================================================
+
+  redis:
+    image: redis:7-alpine
+
+    container_name: nodagent-redis
+
+    ports:
+      - "16379:6379"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+    restart: unless-stopped
+
+
+  # ==================================================
+  # GitHub MCP
+  # Official GitHub MCP Server
+  # Streamable HTTP
+  # ==================================================
+
+  github-mcp:
+    image: ghcr.io/github/github-mcp-server
+
+    container_name: nodagent-github-mcp
+
+    command:
+      - http
+
+    env_file:
+      - .env
+
+    environment:
+      GITHUB_READ_ONLY: "1"
+      GITHUB_TOOLSETS: "repos,issues,pull_requests"
+
+    ports:
+      - "127.0.0.1:8082:8082"
+
+    restart: unless-stopped
+
+
+  # ==================================================
+  # FastAPI Backend
+  # ==================================================
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: nodagent-backend
+
+    env_file:
+      - .env
+
+    environment:
+
+      # ----------------------------------------------
+      # PostgreSQL
+      # Container uses Docker service name.
+      # ----------------------------------------------
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+
+
+      # ----------------------------------------------
+      # Redis
+      # ----------------------------------------------
+
+      REDIS_URL: redis://redis:6379/0
+
+      CELERY_BROKER_URL: redis://redis:6379/0
+
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+
+      # ----------------------------------------------
+      # Ollama
+      # Ollama continues running on the Mac host.
+      # ----------------------------------------------
+
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+
+
+      # ----------------------------------------------
+      # GitHub MCP
+      # Service-name DNS inside Docker network.
+      # ----------------------------------------------
+
+      GITHUB_MCP_URL: http://github-mcp:8082
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./data/uploads:/app/data/uploads
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+      github-mcp:
+        condition: service_started
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8000/"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    restart: unless-stopped
+
+
+  # ==================================================
+  # Celery Document Worker
+  # ==================================================
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: nodagent-worker
+
+    command:
+      [
+        "celery",
+        "-A",
+        "backend.app.celery_app.celery_app",
+        "worker",
+        "--loglevel=info",
+        "-Q",
+        "documents",
+        "--concurrency=1"
+      ]
+
+    env_file:
+      - .env
+
+    environment:
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+
+      REDIS_URL: redis://redis:6379/0
+
+      CELERY_BROKER_URL: redis://redis:6379/0
+
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+
+      GITHUB_MCP_URL: http://github-mcp:8082
+
+    volumes:
+      - ./data/uploads:/app/data/uploads
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
     restart: unless-stopped
 
 
 volumes:
+
   nodagent_postgres_data:
     name: nodagent_postgres_data
