@@ -4,20 +4,26 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+BASE_DIR = Path(
+    __file__
+).resolve().parents[3]
 
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(
+    BASE_DIR / ".env"
+)
 
 
-# =========================
-# PostgreSQL
-# =========================
+POSTGRES_USER = os.getenv(
+    "POSTGRES_USER"
+)
 
-POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv(
     "POSTGRES_PASSWORD"
 )
-POSTGRES_DB = os.getenv("POSTGRES_DB")
+
+POSTGRES_DB = os.getenv(
+    "POSTGRES_DB"
+)
 
 POSTGRES_HOST = os.getenv(
     "POSTGRES_HOST",
@@ -66,19 +72,17 @@ CHECKPOINT_DATABASE_URL = (
 )
 
 
-# =========================
-# Ollama Embedding
-# =========================
-
 OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
     "http://localhost:11434",
 )
 
+
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL_NAME",
     "qwen3-embedding:4b",
 )
+
 
 EMBEDDING_DIMENSION = int(
     os.getenv(
@@ -88,13 +92,10 @@ EMBEDDING_DIMENSION = int(
 )
 
 
-# =========================
-# DeepSeek LLM
-# =========================
-
 DEEPSEEK_API_KEY = os.getenv(
     "DEEPSEEK_API_KEY"
 )
+
 
 DEEPSEEK_MODEL = os.getenv(
     "DEEPSEEK_MODEL",
@@ -108,15 +109,30 @@ if not DEEPSEEK_API_KEY:
     )
 
 
-# =========================
-# LangGraph
-# =========================
-
 LANGGRAPH_STRICT_MSGPACK = os.getenv(
     "LANGGRAPH_STRICT_MSGPACK",
     "true",
 )
 
+
 os.environ[
     "LANGGRAPH_STRICT_MSGPACK"
 ] = LANGGRAPH_STRICT_MSGPACK
+
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://localhost:16379/0",
+)
+
+
+CELERY_BROKER_URL = os.getenv(
+    "CELERY_BROKER_URL",
+    REDIS_URL,
+)
+
+
+CELERY_RESULT_BACKEND = os.getenv(
+    "CELERY_RESULT_BACKEND",
+    "redis://localhost:16379/1",
+)
