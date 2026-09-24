@@ -4,6 +4,7 @@ from typing import (
     Dict,
     List,
     Literal,
+    Optional,
     Union,
 )
 
@@ -16,11 +17,17 @@ from pydantic import (
 class ChatSource(BaseModel):
     source_number: int
 
+    citation: str
+
     chunk_id: int
 
     document_id: int
 
+    filename: str
+
     chunk_index: int
+
+    page_number: Optional[int] = None
 
     content: str
 
@@ -29,7 +36,17 @@ class ChatSource(BaseModel):
         Any,
     ]
 
-    distance: float
+    distance: Optional[float] = None
+
+    similarity: Optional[float] = None
+
+    keyword_score: Optional[float] = None
+
+    vector_rank: Optional[int] = None
+
+    keyword_rank: Optional[int] = None
+
+    rrf_score: Optional[float] = None
 
 
 class ChatRequest(BaseModel):

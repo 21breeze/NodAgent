@@ -1,7 +1,7 @@
+import asyncio
 from typing import (
     Any,
     Dict,
-    List,
     Tuple,
 )
 
@@ -16,6 +16,7 @@ from backend.app.agents.context import (
     AgentContext,
 )
 from backend.app.services import (
+    citation_service,
     retrieval_service,
 )
 
@@ -82,93 +83,17 @@ async def search_knowledge_base(
             },
         )
 
-    context_parts: List[
-        str
-    ] = []
-
-    sources: List[
-        Dict[str, Any]
-    ] = []
-
-    for index, result in enumerate(
+    sources = await asyncio.to_thread(
+        citation_service
+        .build_citation_sources,
         results,
-        start=1,
-    ):
-        metadata = dict(
-            result.metadata_json
+    )
+
+    tool_content = (
+        citation_service
+        .build_citation_context(
+            sources
         )
-
-        page = metadata.get(
-            "page"
-        )
-
-        source_info = [
-            (
-                f"document_id="
-                f"{result.document_id}"
-            ),
-            (
-                f"chunk_index="
-                f"{result.chunk_index}"
-            ),
-        ]
-
-        if page is not None:
-            source_info.append(
-                f"page={page}"
-            )
-
-        context_parts.append(
-            (
-                f"[{index}]\n"
-                f"{', '.join(source_info)}\n"
-                f"{result.content}"
-            )
-        )
-
-        sources.append(
-            {
-                "source_number": (
-                    index
-                ),
-                "chunk_id": (
-                    result.chunk_id
-                ),
-                "document_id": (
-                    result.document_id
-                ),
-                "chunk_index": (
-                    result.chunk_index
-                ),
-                "content": (
-                    result.content
-                ),
-                "metadata_json": (
-                    result.metadata_json
-                ),
-                "distance": (
-                    result.distance
-                ),
-                "similarity": (
-                    result.similarity
-                ),
-                "keyword_score": (
-                    result.keyword_score
-                ),
-                "vector_rank": (
-                    result.vector_rank
-                ),
-                "keyword_rank": (
-                    result.keyword_rank
-                ),
-                "rrf_score": (
-                    result.rrf_score
-                ),
-            }
-        )
-
-    tool_content = "\n\n".join(
-        context_parts
     )
 
     artifact = {
