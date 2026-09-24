@@ -10,7 +10,7 @@
 ![Redis](https://img.shields.io/badge/Redis-Celery-DC382D?logo=redis\&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker\&logoColor=white)
 
-**NodAgent** 是一个面向个人与团队知识管理场景的 AI 应用后端，基于 **FastAPI + LangGraph + PostgreSQL/pgvector + Redis/Celery + MCP + Docker Compose** 构建。
+**NodAgent** 是一个面向个人与团队知识管理场景的 AI 应用，基于 **React + FastAPI + LangGraph + PostgreSQL/pgvector + Redis/Celery + MCP + Docker Compose** 构建。
 
 项目重点不是简单封装一次 LLM API，而是围绕真实 AI 应用中的几个核心问题进行设计：
 
@@ -87,6 +87,7 @@
 * PostgreSQL + pgvector
 * Redis
 * GitHub MCP Server
+* React Web Frontend（Nginx）
 
 Ollama 保留运行在宿主机，由 Backend / Worker 通过 `host.docker.internal` 调用。
 
@@ -97,11 +98,13 @@ Ollama 保留运行在宿主机，由 Backend / Worker 通过 `host.docker.inter
 ```mermaid
 flowchart TB
 
-    User["User / Client"]
+    Browser["Browser"]
+    Frontend["React Frontend"]
     API["FastAPI Backend"]
     Graph["LangGraph MainGraph"]
 
-    User --> API
+    Browser --> Frontend
+    Frontend --> API
     API --> Graph
 
     Graph --> Router["Router"]
@@ -661,6 +664,25 @@ done
 
 ---
 
+# 🖥 Web UI
+
+`frontend/` 使用 React、TypeScript 和 Vite，提供 Chat 与 Documents 两个页面。Chat 通过 POST SSE 实时追加 Token，展示 Markdown、代码块与 RAG Sources；删除文档时显示 HITL 确认卡，并在原 Workspace、User 和 Thread 上调用流式 Resume。Documents 支持 PDF / TXT / MD 上传、Chunk 查看及每 2 秒状态轮询。
+
+Docker Compose 启动后访问 **http://localhost:3000**。前端由 Nginx 提供静态文件，并将 `/api` 代理到 backend。首次使用可在左侧选择或创建 Workspace；User ID 默认 `demo-user`，可在 Workspace settings 修改。Chat Thread 由前端调用现有 Threads API 创建，并在本地保存当前选择。
+
+单独开发前端时：
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+打开 **http://localhost:5173**。默认 `VITE_API_BASE_URL` 为空，Vite 将 `/api` 代理到本机 `localhost:8000`；容器构建同样使用相对 `/api`。后端未启用 CORS，因此前端与后端分开部署到不同 Origin 时，需要配置同源反向代理或相应 CORS 规则。
+
+---
+
 # 🐳 Docker Architecture
 
 NodAgent 使用 Docker Compose 管理主要应用服务。
@@ -668,9 +690,10 @@ NodAgent 使用 Docker Compose 管理主要应用服务。
 ```mermaid
 flowchart LR
 
-    User["Client"]
+    User["Browser"]
 
     subgraph Docker["Docker Compose"]
+        Frontend["React Frontend / Nginx"]
         Backend["FastAPI Backend"]
         Worker["Celery Worker"]
         PostgreSQL["PostgreSQL + pgvector"]
@@ -680,7 +703,8 @@ flowchart LR
 
     Ollama["Host Ollama<br/>qwen3-embedding:4b"]
 
-    User --> Backend
+    User --> Frontend
+    Frontend --> Backend
 
     Backend --> PostgreSQL
     Backend --> Redis
@@ -696,6 +720,7 @@ flowchart LR
 Docker Compose 当前管理：
 
 ```text
+frontend
 backend
 worker
 postgres
@@ -784,6 +809,7 @@ docker compose down
 | ---------------- | ----------------------------------- |
 | Language         | Python 3.11                         |
 | API              | FastAPI                             |
+| Web UI           | React / TypeScript / Vite / Nginx   |
 | Agent            | LangChain / LangGraph               |
 | LLM              | DeepSeek                            |
 | Embedding        | Ollama / qwen3-embedding:4b         |
@@ -842,6 +868,16 @@ NodAgent/
 │       │
 │       ├── celery_app.py
 │       └── main.py
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/chat/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── Dockerfile
+│   └── nginx.conf
 │
 ├── data/
 │   └── uploads/
