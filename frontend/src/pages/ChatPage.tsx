@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUp, MessageSquare, Plus, Sparkles } from 'lucide-react'
+import { ArrowUp, MessageSquare, Sparkles } from 'lucide-react'
 import { ConfirmationCard } from '../components/chat/ConfirmationCard'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { createThread, listMessages, listThreads, streamChat } from '../services/chat'
@@ -9,7 +9,16 @@ const storageKey = (workspaceId: number, userId: string) => `nodagent.thread.${w
 const interruptKey = (workspaceId: number, userId: string, threadId: string) => `nodagent.interrupt.${workspaceId}.${userId}.${threadId}`
 const suggestions = ['Python 的装饰器是什么？', '总结知识库中的文档', '东京现在天气怎么样？', '查看 21breeze/NodAgent 仓库信息']
 
-export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId: string }) {
+interface ChatPageProps {
+  workspaceId: number
+  userId: string
+  selectedThreadId: string | null
+  newChatRequest: number
+  onThreadsChange: (items: Thread[]) => void
+  onThreadChange: (id: string | null) => void
+}
+
+export function ChatPage({ workspaceId, userId, selectedThreadId, newChatRequest, onThreadsChange, onThreadChange }: ChatPageProps) {
   const [threads, setThreads] = useState<Thread[]>([])
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -19,6 +28,16 @@ export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId:
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const newThreadRef = useRef<string | null>(null)
+  const seenNewChatRequest = useRef(newChatRequest)
+
+  useEffect(() => { onThreadsChange(threads) }, [threads, onThreadsChange])
+  useEffect(() => { onThreadChange(thread?.thread_id || null) }, [thread?.thread_id, onThreadChange])
+  useEffect(() => {
+    if (busy) return
+    if (!selectedThreadId || selectedThreadId === thread?.thread_id) return
+    const selected = threads.find(item => item.thread_id === selectedThreadId)
+    if (selected) setThread(selected)
+  }, [busy, selectedThreadId, threads, thread?.thread_id])
 
   useEffect(() => {
     let active = true
@@ -28,7 +47,7 @@ export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId:
       if (!active) return
       setThreads(items)
       const saved = localStorage.getItem(storageKey(workspaceId, userId))
-      setThread(items.find(item => item.thread_id === saved) || items[0] || null)
+      setThread(items.find(item => item.thread_id === selectedThreadId) || items.find(item => item.thread_id === saved) || items[0] || null)
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : String(err)) })
     return () => { active = false; abortRef.current?.abort() }
   }, [workspaceId, userId])
@@ -56,10 +75,18 @@ export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId:
       const created = await createThread(workspaceId, userId)
       newThreadRef.current = created.thread_id
       setThreads(items => [created, ...items])
+      onThreadChange(created.thread_id)
       setThread(created); setMessages([]); setError('')
       return created
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); return null }
-  }, [workspaceId, userId, busy])
+  }, [workspaceId, userId, busy, onThreadChange])
+
+  useEffect(() => {
+    if (newChatRequest === seenNewChatRequest.current) return
+    if (busy) return
+    seenNewChatRequest.current = newChatRequest
+    void newThread()
+  }, [busy, newChatRequest, newThread])
 
   async function runStream(activeThread: Thread, key: string, payload: { message?: string; decision?: 'approve' | 'reject' }) {
     const controller = new AbortController()
@@ -73,8 +100,8 @@ export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId:
         if (event === 'sources') setMessages(items => items.map(item => item.key === key ? { ...item, sources: (value.sources as Source[]) || [] } : item))
         if (event === 'interrupt') { terminal = true; localStorage.setItem(interruptKey(workspaceId, userId, activeThread.thread_id), JSON.stringify(value)); setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, interrupt: value as unknown as Interrupt } : item)) }
         if (event === 'resume') setMessages(items => items.map(item => item.key === key ? { ...item, interrupt: undefined, content: '', sources: [] } : item))
-        if (event === 'done') { terminal = true; localStorage.removeItem(interruptKey(workspaceId, userId, activeThread.thread_id)); setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, interrupt: undefined } : item)); void listThreads(workspaceId, userId).then(setThreads) }
-        if (event === 'error') { terminal = true; setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, error: String(value.message || 'Agent failed') } : item)) }
+        if (event === 'done') { terminal = true; localStorage.removeItem(interruptKey(workspaceId, userId, activeThread.thread_id)); setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, interrupt: undefined } : item)); void listThreads(workspaceId, userId).then(items => { setThreads(items); setThread(current => items.find(item => item.thread_id === current?.thread_id) || current) }) }
+        if (event === 'error') { terminal = true; setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, error: String(value.message || '智能体执行失败') } : item)) }
       }, controller.signal)
     } catch (err) {
       if (!controller.signal.aborted) setMessages(items => items.map(item => item.key === key ? { ...item, pending: false, error: err instanceof Error ? err.message : String(err) } : item))
@@ -103,12 +130,8 @@ export function ChatPage({ workspaceId, userId }: { workspaceId: number; userId:
   }
 
   const pending = messages.find(message => message.interrupt)
+  const composer = <div className="composer-wrap">{error && <div className="inline-error" role="alert">{error}</div>}{pending && <div className="composer-note">请先处理上方的操作确认，再继续当前对话。</div>}<div className="composer"><textarea aria-label="输入消息" placeholder="问问 NodAgent" rows={2} value={draft} disabled={busy || !!pending} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send() } }} /><button className="send-button" aria-label="发送消息" disabled={!draft.trim() || busy || !!pending} onClick={() => void send()}><ArrowUp size={19} /></button></div><div className="composer-footer"><span>按 Enter 发送 · Shift + Enter 换行</span><span>NodAgent 的回答可能有误，请核对重要信息。</span></div></div>
   return <div className="chat-layout">
-    <div className="chat-heading"><div><div className="eyebrow">AI ASSISTANT</div><h1>Chat</h1><p>Ask anything, search your knowledge base, or work with connected tools.</p></div><button className="button-outline" onClick={() => void newThread()} disabled={busy}><Plus size={16} /> New thread</button></div>
-    <div className="thread-strip"><MessageSquare size={14} /><span>THREAD</span><select aria-label="Current thread" value={thread?.thread_id || ''} onChange={event => setThread(threads.find(item => item.thread_id === event.target.value) || null)} disabled={busy}><option value="">New conversation</option>{threads.map(item => <option value={item.thread_id} key={item.thread_id}>{item.title} · {item.thread_id.slice(0, 8)}</option>)}</select>{thread && <code title={thread.thread_id}>{thread.thread_id.slice(0, 8)}</code>}</div>
-    <div className="chat-scroll">
-      {messages.length === 0 ? <div className="chat-empty"><div className="empty-symbol"><Sparkles size={27} /></div><h2>What can I help you explore?</h2><p>Connect ideas across your documents, ask a general question, or use an external tool. Your workspace is ready.</p><div className="suggestions">{suggestions.map(suggestion => <button key={suggestion} onClick={() => void send(suggestion)}>{suggestion}<span>↗</span></button>)}</div></div> : <div className="message-list">{messages.map(message => <div key={message.key}><MessageBubble message={message} />{message.interrupt && <ConfirmationCard interrupt={message.interrupt} busy={busy} onDecision={decision => void decide(message.key, decision)} />}</div>)}<div ref={bottomRef} /></div>}
-    </div>
-    <div className="composer-wrap">{error && <div className="inline-error" role="alert">{error}</div>}{pending && <div className="composer-note">Respond to the confirmation above to continue this thread.</div>}<div className="composer"><textarea aria-label="Message" placeholder="Ask NodAgent anything..." rows={2} value={draft} disabled={busy || !!pending} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} /><button className="send-button" aria-label="Send message" disabled={!draft.trim() || busy || !!pending} onClick={() => void send()}><ArrowUp size={19} /></button></div><div className="composer-footer"><span>Enter to send · Shift + Enter for a new line</span><span>Powered by LangGraph</span></div></div>
+    {messages.length === 0 ? <div className="chat-home"><div className="chat-home-inner"><div className="home-greeting"><Sparkles size={27} /><h1>你好，想从哪里开始？</h1><p>与 NodAgent 对话，查找知识库内容，或获取实时信息。</p></div>{composer}<div className="suggestions">{suggestions.map(suggestion => <button key={suggestion} onClick={() => void send(suggestion)}>{suggestion}<span>↗</span></button>)}</div></div></div> : <><div className="chat-context-bar"><MessageSquare size={15} /><span>{thread?.title || '新对话'}</span>{thread && <code title={thread.thread_id}>会话 {thread.thread_id.slice(0, 8)}</code>}</div><div className="chat-scroll"><div className="message-list">{messages.map(message => <div key={message.key}><MessageBubble message={message} />{message.interrupt && <ConfirmationCard interrupt={message.interrupt} busy={busy} onDecision={decision => void decide(message.key, decision)} />}</div>)}<div ref={bottomRef} /></div></div>{composer}</>}
   </div>
 }
