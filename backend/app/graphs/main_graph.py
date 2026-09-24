@@ -152,7 +152,8 @@ delete_document
 direct
 ==================================================
 
-普通知识问题，不依赖 Workspace 数据。
+普通聊天、通用知识问题，
+以及已经能够直接从长期记忆中回答的问题。
 
 例如：
 
@@ -160,11 +161,20 @@ Python 字典是什么？
 什么是二分查找？
 FastAPI Depends 是什么？
 
+我之前对代码修改有什么要求？
+当前 Workspace 主要是什么项目？
+
+如果当前用户或 Workspace 的长期记忆
+已经足以回答问题，应选择 direct，
+不要为了重复确认而进入 knowledge。
+
 ==================================================
 knowledge
 ==================================================
 
-需要读取 Workspace 中文档正文。
+只有当回答确实需要读取 Workspace
+中的文档正文、Chunk 或知识库证据时，
+才选择 knowledge。
 
 例如：
 
@@ -172,6 +182,9 @@ knowledge
 论文有什么创新？
 总结知识库里的文档。
 根据我的简历介绍项目。
+
+如果长期记忆已经包含足够的信息，
+不要进入 knowledge。
 
 ==================================================
 document
@@ -248,7 +261,14 @@ CHAT_SYSTEM_PROMPT = """
 1. 根据用户问题、聊天历史以及专业节点结果，
    生成最终面向用户的回答。
 
-2. Workspace 相关事实必须以专业节点结果为准。
+2. 如果问题涉及 Workspace 文档正文、
+   论文、简历或知识库证据，
+   必须以专业节点结果为准。
+
+   如果问题只是询问长期记忆中已经明确保存的
+   用户偏好或 Workspace 高层业务信息，
+   可以直接依据长期记忆回答，
+   不要求再次查询知识库。
 
 3. 如果 Knowledge Agent 返回了
    [1]、[2] 等来源编号，应保留。
@@ -498,18 +518,47 @@ def extract_documents(
 
 async def router_node(
     state: MainGraphState,
+    runtime: Runtime[
+        AgentContext
+    ],
 ):
     messages = state.get(
         "messages",
         [],
     )
 
+    router_system_prompt = (
+        ROUTER_SYSTEM_PROMPT
+    )
+
+    memory_prompt = (
+        runtime.context.get(
+            "memory_prompt",
+            "",
+        )
+    )
+
+    if memory_prompt:
+        router_system_prompt += (
+            "\n\n"
+            "==================================================\n"
+            "当前可用长期记忆\n"
+            "==================================================\n"
+            f"{memory_prompt}\n\n"
+            "这些长期记忆已经可以作为 Router "
+            "判断路由时的上下文。"
+            "如果长期记忆本身足以回答用户问题，"
+            "请选择 direct。"
+            "只有确实需要读取 Workspace 文档正文时，"
+            "才选择 knowledge。"
+        )
+
     decision = await (
         get_router_model().ainvoke(
             [
                 SystemMessage(
                     content=(
-                        ROUTER_SYSTEM_PROMPT
+                        router_system_prompt
                     )
                 ),
                 *messages,
@@ -994,6 +1043,9 @@ async def execute_delete_node(
 
 async def chat_node(
     state: MainGraphState,
+    runtime: Runtime[
+        AgentContext
+    ],
 ):
     specialist_answer = (
         state.get(
@@ -1012,6 +1064,26 @@ async def chat_node(
     system_prompt = (
         CHAT_SYSTEM_PROMPT
     )
+
+    memory_prompt = (
+        runtime.context.get(
+            "memory_prompt",
+            "",
+        )
+    )
+
+    if memory_prompt:
+        system_prompt += (
+            "\n\n"
+            "以下是当前用户和 Workspace "
+            "的长期记忆。"
+            "这些信息可以作为回答时的长期上下文。"
+            "如果长期记忆与用户当前消息冲突，"
+            "以用户当前消息为准。"
+            "不要向用户暴露记忆系统的内部实现。"
+            "\n\n"
+            f"{memory_prompt}"
+        )
 
     if specialist_answer:
         system_prompt += (

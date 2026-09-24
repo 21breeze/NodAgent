@@ -30,6 +30,7 @@ from backend.app.schemas.chat import (
     ChatSource,
 )
 from backend.app.services import (
+    agent_context_service,
     chat_history_service,
 )
 
@@ -300,11 +301,14 @@ def build_agent_context(
     workspace_id: int,
     top_k: int,
 ):
-    return {
-        "user_id": user_id,
-        "workspace_id": workspace_id,
-        "top_k": top_k,
-    }
+    return (
+        agent_context_service
+        .build_agent_context(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            top_k=top_k,
+        )
+    )
 
 
 def build_interrupt_response(

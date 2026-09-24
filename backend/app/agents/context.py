@@ -7,3 +7,5 @@ class AgentContext(TypedDict):
     workspace_id: int
 
     top_k: int
+
+    memory_prompt: str
