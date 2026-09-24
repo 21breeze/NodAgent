@@ -14,14 +14,13 @@ from backend.app.models.agent_memory import (
 )
 
 
-def upsert_memory(
+def get_memory_by_key(
     db: Session,
     workspace_id: int,
     memory_scope: str,
     memory_key: str,
-    memory_value: str,
     user_id: Optional[str] = None,
-) -> AgentMemory:
+) -> Optional[AgentMemory]:
     query = (
         db.query(AgentMemory)
         .filter(
@@ -44,7 +43,24 @@ def upsert_memory(
             AgentMemory.user_id.is_(None)
         )
 
-    memory = query.first()
+    return query.first()
+
+
+def upsert_memory(
+    db: Session,
+    workspace_id: int,
+    memory_scope: str,
+    memory_key: str,
+    memory_value: str,
+    user_id: Optional[str] = None,
+) -> AgentMemory:
+    memory = get_memory_by_key(
+        db=db,
+        workspace_id=workspace_id,
+        memory_scope=memory_scope,
+        memory_key=memory_key,
+        user_id=user_id,
+    )
 
     if memory is None:
         memory = AgentMemory(
@@ -124,6 +140,31 @@ def delete_memory(
             == workspace_id,
         )
         .first()
+    )
+
+    if memory is None:
+        return False
+
+    db.delete(memory)
+
+    db.commit()
+
+    return True
+
+
+def delete_memory_by_key(
+    db: Session,
+    workspace_id: int,
+    memory_scope: str,
+    memory_key: str,
+    user_id: Optional[str] = None,
+) -> bool:
+    memory = get_memory_by_key(
+        db=db,
+        workspace_id=workspace_id,
+        memory_scope=memory_scope,
+        memory_key=memory_key,
+        user_id=user_id,
     )
 
     if memory is None:

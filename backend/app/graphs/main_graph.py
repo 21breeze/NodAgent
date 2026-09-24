@@ -41,6 +41,9 @@ from backend.app.agents.document_agent import (
 from backend.app.agents.knowledge_agent import (
     get_knowledge_agent,
 )
+from backend.app.agents.memory_agent import (
+    get_memory_agent,
+)
 from backend.app.services import (
     document_action_service,
 )
@@ -56,6 +59,7 @@ RouteName = Literal[
     "direct",
     "knowledge",
     "document",
+    "memory",
     "delete_document",
 ]
 
@@ -146,6 +150,7 @@ ROUTER_SYSTEM_PROMPT = """
 direct
 knowledge
 document
+memory
 delete_document
 
 ==================================================
@@ -198,6 +203,30 @@ document
 哪些文档处理完成？
 7 号文档状态是什么？
 某个文档有多少 Chunk？
+
+==================================================
+memory
+==================================================
+
+用户明确要求管理长期记忆时选择 memory。
+
+包括：
+
+记住以后代码修改给完整文件。
+以后回答尽量一步一步讲。
+把这个偏好保存下来。
+我有哪些长期记忆？
+你现在记得我什么？
+把代码修改偏好改成只给关键修改。
+忘掉我的代码修改偏好。
+删除这个长期记忆。
+
+只是在询问已经存在的某条长期信息，
+并且当前长期记忆已经足够回答时，
+可以选择 direct。
+
+只要用户是在保存、更新、列出或删除长期记忆，
+必须选择 memory。
 
 ==================================================
 delete_document
@@ -549,6 +578,8 @@ async def router_node(
             "判断路由时的上下文。"
             "如果长期记忆本身足以回答用户问题，"
             "请选择 direct。"
+            "如果用户要保存、更新、列出或删除长期记忆，"
+            "请选择 memory。"
             "只有确实需要读取 Workspace 文档正文时，"
             "才选择 knowledge。"
         )
@@ -728,6 +759,68 @@ async def document_node(
         "specialist_answer": answer,
         "sources": [],
         "documents": documents,
+    }
+
+
+async def memory_node(
+    state: MainGraphState,
+    runtime: Runtime[
+        AgentContext
+    ],
+):
+    task = state.get(
+        "specialist_task",
+        "",
+    )
+
+    if not task:
+        task = (
+            get_latest_user_message(
+                state.get(
+                    "messages",
+                    [],
+                )
+            )
+        )
+
+    result = await (
+        get_memory_agent()
+        .ainvoke(
+            {
+                "messages": [
+                    HumanMessage(
+                        content=task
+                    )
+                ]
+            },
+            context=runtime.context,
+        )
+    )
+
+    messages = result.get(
+        "messages",
+        [],
+    )
+
+    answer = (
+        get_latest_ai_answer(
+            messages
+        )
+    )
+
+    if not answer:
+        answer = (
+            "长期记忆 Agent "
+            "没有生成有效回答。"
+        )
+
+    return {
+        "specialist_agent": (
+            "memory"
+        ),
+        "specialist_answer": answer,
+        "sources": [],
+        "documents": [],
     }
 
 
@@ -1152,6 +1245,11 @@ def build_main_graph(
     )
 
     graph.add_node(
+        "memory",
+        memory_node,
+    )
+
+    graph.add_node(
         "prepare_delete",
         prepare_delete_node,
     )
@@ -1190,6 +1288,10 @@ def build_main_graph(
                 "document"
             ),
 
+            "memory": (
+                "memory"
+            ),
+
             "delete_document": (
                 "prepare_delete"
             ),
@@ -1203,6 +1305,11 @@ def build_main_graph(
 
     graph.add_edge(
         "document",
+        "chat",
+    )
+
+    graph.add_edge(
+        "memory",
         "chat",
     )
 
