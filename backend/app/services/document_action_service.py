@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import (
     Any,
     Dict,
+    List,
 )
 
 from backend.app.core.document_status import (
@@ -72,6 +73,63 @@ def get_document_snapshot(
                 document.processing_status
             ),
         }
+
+
+def normalize_document_filename(
+    filename: str,
+) -> str:
+    return (
+        filename.strip()
+        .strip("`\"'“”‘’")
+    )
+
+
+def find_document_snapshots_by_filename(
+    workspace_id: int,
+    filename: str,
+) -> List[Dict[str, Any]]:
+    normalized_filename = (
+        normalize_document_filename(
+            filename
+        )
+    )
+
+    if not normalized_filename:
+        return []
+
+    with SessionLocal() as db:
+        documents = (
+            db.query(Document)
+            .filter(
+                Document.workspace_id
+                == workspace_id,
+                Document.filename
+                == normalized_filename,
+            )
+            .order_by(
+                Document.id
+            )
+            .all()
+        )
+
+        return [
+            {
+                "id": document.id,
+                "workspace_id": (
+                    document.workspace_id
+                ),
+                "filename": (
+                    document.filename
+                ),
+                "file_path": (
+                    document.file_path
+                ),
+                "processing_status": (
+                    document.processing_status
+                ),
+            }
+            for document in documents
+        ]
 
 
 def delete_document(

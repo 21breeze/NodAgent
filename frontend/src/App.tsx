@@ -21,6 +21,7 @@ export default function App() {
   const [recentThreads, setRecentThreads] = useState<Thread[]>([])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [newChatRequest, setNewChatRequest] = useState(0)
+  const [deleteRequest, setDeleteRequest] = useState<{ documentId: number; token: number } | null>(null)
 
   useEffect(() => {
     listWorkspaces().then(items => {
@@ -51,6 +52,11 @@ export default function App() {
   function openNewChat() {
     setPage('chat')
     setNewChatRequest(value => value + 1)
+  }
+
+  function requestDocumentDelete(documentId: number) {
+    setDeleteRequest(current => ({ documentId, token: (current?.token || 0) + 1 }))
+    setPage('chat')
   }
 
   return <div className="app-shell">
@@ -89,8 +95,8 @@ export default function App() {
       <header className="topbar"><div className="topbar-title">NodAgent <ChevronDown size={15} /></div><div className="topbar-right"><span className="workspace-pill">{workspace?.name || '未选择工作区'}</span><span className="user-pill" title={`用户：${userId}`}>{userId.slice(0, 1).toUpperCase() || 'U'}</span></div></header>
       {error && <div className="global-error" role="alert">{error}<button onClick={() => setError('')}>关闭</button></div>}
       {loading ? <div className="center-state">正在加载工作区…</div> : !workspaceId ? <div className="center-state"><h2>还没有工作区</h2><p>打开左下角的工作区设置，创建一个工作区即可开始。</p></div> : !userId.trim() ? <div className="center-state">请在工作区设置中填写用户 ID。</div> : <>
-        <div style={{ display: page === 'chat' ? 'flex' : 'none', minHeight: 0, flex: 1 }}><ChatPage workspaceId={workspaceId} userId={userId} selectedThreadId={activeThreadId} newChatRequest={newChatRequest} onThreadsChange={updateThreads} onThreadChange={updateThread} /></div>
-        {page === 'documents' && <DocumentsPage workspaceId={workspaceId} />}
+        <div style={{ display: page === 'chat' ? 'flex' : 'none', minHeight: 0, flex: 1 }}><ChatPage workspaceId={workspaceId} userId={userId} selectedThreadId={activeThreadId} newChatRequest={newChatRequest} deleteRequest={deleteRequest} onThreadsChange={updateThreads} onThreadChange={updateThread} /></div>
+        {page === 'documents' && <DocumentsPage workspaceId={workspaceId} onDeleteRequest={requestDocumentDelete} />}
       </>}
     </div>
   </div>

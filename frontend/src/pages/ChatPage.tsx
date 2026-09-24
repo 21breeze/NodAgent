@@ -14,21 +14,31 @@ interface ChatPageProps {
   userId: string
   selectedThreadId: string | null
   newChatRequest: number
+  deleteRequest: { documentId: number; token: number } | null
   onThreadsChange: (items: Thread[]) => void
   onThreadChange: (id: string | null) => void
 }
 
-export function ChatPage({ workspaceId, userId, selectedThreadId, newChatRequest, onThreadsChange, onThreadChange }: ChatPageProps) {
+export function ChatPage({ workspaceId, userId, selectedThreadId, newChatRequest, deleteRequest, onThreadsChange, onThreadChange }: ChatPageProps) {
   const [threads, setThreads] = useState<Thread[]>([])
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
+  const [deleteNotice, setDeleteNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const newThreadRef = useRef<string | null>(null)
   const seenNewChatRequest = useRef(newChatRequest)
+  const seenDeleteRequest = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!deleteRequest || seenDeleteRequest.current === deleteRequest.token) return
+    seenDeleteRequest.current = deleteRequest.token
+    setDraft(`删除 document_id=${deleteRequest.documentId} 的文档。`)
+    setDeleteNotice('删除请求已填入。发送后请在确认卡中核对文档，再选择批准或拒绝。')
+  }, [deleteRequest])
 
   useEffect(() => { onThreadsChange(threads) }, [threads, onThreadsChange])
   useEffect(() => { onThreadChange(thread?.thread_id || null) }, [thread?.thread_id, onThreadChange])
@@ -120,6 +130,7 @@ export function ChatPage({ workspaceId, userId, selectedThreadId, newChatRequest
     const userKey = crypto.randomUUID(), aiKey = crypto.randomUUID()
     setMessages(items => [...items, { key: userKey, role: 'user', content: message, sources: [] }, { key: aiKey, role: 'assistant', content: '', sources: [], pending: true }])
     setDraft('')
+    setDeleteNotice('')
     await runStream(activeThread, aiKey, { message })
   }
 
@@ -130,7 +141,7 @@ export function ChatPage({ workspaceId, userId, selectedThreadId, newChatRequest
   }
 
   const pending = messages.find(message => message.interrupt)
-  const composer = <div className="composer-wrap">{error && <div className="inline-error" role="alert">{error}</div>}{pending && <div className="composer-note">请先处理上方的操作确认，再继续当前对话。</div>}<div className="composer"><textarea aria-label="输入消息" placeholder="问问 NodAgent" rows={2} value={draft} disabled={busy || !!pending} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send() } }} /><button className="send-button" aria-label="发送消息" disabled={!draft.trim() || busy || !!pending} onClick={() => void send()}><ArrowUp size={19} /></button></div><div className="composer-footer"><span>按 Enter 发送 · Shift + Enter 换行</span><span>NodAgent 的回答可能有误，请核对重要信息。</span></div></div>
+  const composer = <div className="composer-wrap">{error && <div className="inline-error" role="alert">{error}</div>}{pending && <div className="composer-note">请先处理上方的操作确认，再继续当前对话。</div>}{deleteNotice && <div className="composer-note">{deleteNotice}</div>}<div className="composer"><textarea aria-label="输入消息" placeholder="问问 NodAgent" rows={2} value={draft} disabled={busy || !!pending} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send() } }} /><button className="send-button" aria-label="发送消息" disabled={!draft.trim() || busy || !!pending} onClick={() => void send()}><ArrowUp size={19} /></button></div><div className="composer-footer"><span>按 Enter 发送 · Shift + Enter 换行</span><span>NodAgent 的回答可能有误，请核对重要信息。</span></div></div>
   return <div className="chat-layout">
     {messages.length === 0 ? <div className="chat-home"><div className="chat-home-inner"><div className="home-greeting"><Sparkles size={27} /><h1>你好，想从哪里开始？</h1><p>与 NodAgent 对话，查找知识库内容，或获取实时信息。</p></div>{composer}<div className="suggestions">{suggestions.map(suggestion => <button key={suggestion} onClick={() => void send(suggestion)}>{suggestion}<span>↗</span></button>)}</div></div></div> : <><div className="chat-context-bar"><MessageSquare size={15} /><span>{thread?.title || '新对话'}</span>{thread && <code title={thread.thread_id}>会话 {thread.thread_id.slice(0, 8)}</code>}</div><div className="chat-scroll"><div className="message-list">{messages.map(message => <div key={message.key}><MessageBubble message={message} />{message.interrupt && <ConfirmationCard interrupt={message.interrupt} busy={busy} onDecision={decision => void decide(message.key, decision)} />}</div>)}<div ref={bottomRef} /></div></div>{composer}</>}
   </div>

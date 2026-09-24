@@ -12,6 +12,10 @@
 
 **NodAgent** 是一个面向个人与团队知识管理场景的 AI 应用，基于 **React + FastAPI + LangGraph + PostgreSQL/pgvector + Redis/Celery + MCP + Docker Compose** 构建。
 
+![NodAgent 聊天界面：Markdown 与代码块](docs/images/web-chat.png)
+
+*Chat 页面：在 Workspace 中对话，展示流式回答、Markdown 和代码块。*
+
 项目重点不是简单封装一次 LLM API，而是围绕真实 AI 应用中的几个核心问题进行设计：
 
 * 如何使用 LangGraph 编排多个 Specialist Agent？
@@ -397,6 +401,8 @@ failed
 ## User Memory
 
 保存与用户相关的长期偏好。
+同一 `user_id` 的用户记忆可跨 Workspace 和 Thread 使用，
+在任一 Workspace 更新或删除后，其余 Workspace 也会看到变化。
 
 例如：
 
@@ -409,6 +415,7 @@ coding_preference
 ## Workspace Memory
 
 保存 Workspace 级稳定信息。
+这类记忆只在对应 Workspace 内可见。
 
 例如：
 
@@ -486,6 +493,8 @@ LangGraph checkpoint tables
 # 🧑‍💻 Human-in-the-Loop
 
 对于删除文档等有副作用的操作，Agent 不会直接执行。
+可按文档 ID 或当前 Workspace 中的完整文件名发起删除；
+同名文档需要进一步指定 ID，目标唯一后才进入人工确认。
 
 ```mermaid
 flowchart TD
@@ -666,7 +675,11 @@ done
 
 # 🖥 Web UI
 
-`frontend/` 使用 React、TypeScript 和 Vite，提供 Chat 与 Documents 两个页面。Chat 通过 POST SSE 实时追加 Token，展示 Markdown、代码块与 RAG Sources；删除文档时显示 HITL 确认卡，并在原 Workspace、User 和 Thread 上调用流式 Resume。Documents 支持 PDF / TXT / MD 上传、Chunk 查看及每 2 秒状态轮询。
+`frontend/` 使用 React、TypeScript 和 Vite，提供 Chat 与 Documents 两个页面。Chat 通过 POST SSE 实时追加 Token，展示 Markdown、代码块与 RAG Sources；删除文档时显示 HITL 确认卡，并在原 Workspace、User 和 Thread 上调用流式 Resume。Documents 支持 PDF / TXT / MD 上传、Chunk 查看及每 2 秒状态轮询；点击删除会带着文档 ID 转到 Chat，由同一 HITL 流程确认后执行。
+
+![NodAgent 文档管理界面：上传与处理状态](docs/images/web-documents.png)
+
+*Documents 页面：上传入口、处理统计、文档列表和状态。截图中的文件是演示数据。*
 
 Docker Compose 启动后访问 **http://localhost:3000**。前端由 Nginx 提供静态文件，并将 `/api` 代理到 backend。首次使用可在左侧选择或创建 Workspace；User ID 默认 `demo-user`，可在 Workspace settings 修改。Chat Thread 由前端调用现有 Threads API 创建，并在本地保存当前选择。
 

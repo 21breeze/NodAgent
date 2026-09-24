@@ -97,6 +97,10 @@ class MainGraphState(
         int
     ]
 
+    action_document_filename: Optional[
+        str
+    ]
+
     action_ready: bool
 
     action_approved: bool
@@ -130,6 +134,16 @@ class RouteDecision(BaseModel):
             "request targets a specific "
             "document. Do not invent "
             "an ID."
+        ),
+    )
+
+    document_filename: Optional[str] = Field(
+        default=None,
+        description=(
+            "Exact filename when a delete "
+            "request identifies a document "
+            "by name rather than ID. "
+            "Do not invent a filename."
         ),
     )
 
@@ -271,6 +285,12 @@ delete_document
 删除 7 号文档。
 把刚才那个文件删掉。
 删除 document_id=12。
+删除 CET6_202209_322110221202516_1.pdf。
+
+如果用户在删除对话中补充文件名、
+回答候选编号，或说“确认删除”，
+仍应根据聊天历史进入 delete_document。
+聊天里的“确认”不能代替人工确认步骤。
 
 删除属于有副作用的高风险操作，
 必须进入 delete_document，
@@ -291,11 +311,18 @@ delete_document
 如果能够从历史明确得到 document_id，
 请写入 document_id。
 
+如果只知道文档的完整文件名，
+请把不带引号和路径的名称写入 document_filename，
+document_id 保持 null。
+文件名是否存在由后续节点查询，
+不要因为不知道 ID 就拒绝删除。
+
 如果无法可靠确定 document_id：
 
 document_id 必须为 null。
 
 绝对不要猜 document_id。
+也不要猜 document_filename。
 
 task 必须是一个完整、独立可理解的任务。
 
@@ -311,6 +338,16 @@ task 必须是一个完整、独立可理解的任务。
 route = delete_document
 document_id = 7
 task = 删除 document_id=7 的文档。
+
+用户：
+“删除 report.pdf”
+
+则：
+
+route = delete_document
+document_id = null
+document_filename = report.pdf
+task = 删除 report.pdf。
 """.strip()
 
 
@@ -341,12 +378,18 @@ CHAT_SYSTEM_PROMPT = """
    明确告诉用户操作已经取消。
 
 6. 如果操作无法执行，
-   根据专业节点给出的原因进行说明。
+   只根据专业节点给出的原因进行说明。
+   不要猜测文件名、路径或文档是否存在。
+   不要声称已经检索过没有实际查询的记录。
 
-7. 不要告诉用户内部存在 Router、
+7. 系统支持删除文档，但执行前需要用户确认。
+   不要因为 Document Agent 只有查询工具，
+   就告诉用户整个系统无法删除文档。
+
+8. 不要告诉用户内部存在 Router、
    StateGraph、节点、ToolRuntime 等实现细节。
 
-8. direct 路由没有 specialist_answer 时，
+9. direct 路由没有 specialist_answer 时，
    直接根据聊天历史回答用户。
 """.strip()
 
@@ -640,6 +683,10 @@ async def router_node(
             decision.document_id
         ),
 
+        "action_document_filename": (
+            decision.document_filename
+        ),
+
         "specialist_answer": "",
 
         "specialist_agent": "",
@@ -900,18 +947,9 @@ async def prepare_delete_node(
         "action_document_id"
     )
 
-    if document_id is None:
-        return {
-            "action_ready": False,
-            "specialist_agent": (
-                "document_action"
-            ),
-            "specialist_answer": (
-                "无法确定需要删除的 "
-                "document_id。"
-                "请先明确要删除的文档。"
-            ),
-        }
+    document_filename = state.get(
+        "action_document_filename"
+    )
 
     workspace_id = (
         runtime.context[
@@ -919,25 +957,104 @@ async def prepare_delete_node(
         ]
     )
 
-    try:
-        document = await asyncio.to_thread(
+    if document_id is not None:
+        try:
+            document = await asyncio.to_thread(
+                (
+                    document_action_service
+                    .get_document_snapshot
+                ),
+                workspace_id,
+                document_id,
+            )
+
+        except DocumentActionError as exc:
+            return {
+                "action_ready": False,
+                "specialist_agent": (
+                    "document_action"
+                ),
+                "specialist_answer": (
+                    f"无法准备删除文档："
+                    f"{exc}"
+                ),
+            }
+
+    elif document_filename:
+        matches = await asyncio.to_thread(
             (
                 document_action_service
-                .get_document_snapshot
+                .find_document_snapshots_by_filename
             ),
             workspace_id,
-            document_id,
+            document_filename,
         )
 
-    except DocumentActionError as exc:
+        if not matches:
+            return {
+                "action_ready": False,
+                "specialist_agent": (
+                    "document_action"
+                ),
+                "specialist_answer": (
+                    "当前 Workspace 没有找到"
+                    f"文件名为 {document_filename} "
+                    "的文档。"
+                ),
+            }
+
+        if len(matches) > 1:
+            document_ids = ", ".join(
+                str(document["id"])
+                for document in matches
+            )
+
+            return {
+                "action_ready": False,
+                "specialist_agent": (
+                    "document_action"
+                ),
+                "specialist_answer": (
+                    f"文件名 {document_filename} "
+                    "对应多个文档，ID 分别为 "
+                    f"{document_ids}。"
+                    "请指定要删除的文档 ID。"
+                ),
+            }
+
+        document = matches[0]
+        document_id = document["id"]
+
+    else:
         return {
             "action_ready": False,
             "specialist_agent": (
                 "document_action"
             ),
             "specialist_answer": (
-                f"无法准备删除文档："
-                f"{exc}"
+                "无法确定需要删除的文档。"
+                "请提供文档 ID 或完整文件名。"
+            ),
+        }
+
+    if (
+        document_filename
+        and document["filename"]
+        != (
+            document_action_service
+            .normalize_document_filename(
+                document_filename
+            )
+        )
+    ):
+        return {
+            "action_ready": False,
+            "specialist_agent": (
+                "document_action"
+            ),
+            "specialist_answer": (
+                "文档 ID 与文件名不一致。"
+                "请核对后重新发起删除。"
             ),
         }
 

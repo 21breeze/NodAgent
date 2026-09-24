@@ -24,8 +24,6 @@ def get_memory_by_key(
     query = (
         db.query(AgentMemory)
         .filter(
-            AgentMemory.workspace_id
-            == workspace_id,
             AgentMemory.memory_scope
             == memory_scope,
             AgentMemory.memory_key
@@ -40,10 +38,18 @@ def get_memory_by_key(
         )
     else:
         query = query.filter(
-            AgentMemory.user_id.is_(None)
+            AgentMemory.workspace_id
+            == workspace_id,
+            AgentMemory.user_id.is_(None),
         )
 
-    return query.first()
+    return (
+        query.order_by(
+            AgentMemory.updated_at.desc(),
+            AgentMemory.id.desc(),
+        )
+        .first()
+    )
 
 
 def upsert_memory(
@@ -109,20 +115,32 @@ def get_user_memories(
     workspace_id: int,
     user_id: str,
 ) -> List[AgentMemory]:
-    return (
+    memories = (
         db.query(AgentMemory)
         .filter(
-            AgentMemory.workspace_id
-            == workspace_id,
             AgentMemory.memory_scope
             == "user",
             AgentMemory.user_id
             == user_id,
         )
         .order_by(
-            AgentMemory.memory_key
+            AgentMemory.memory_key,
+            AgentMemory.updated_at.desc(),
+            AgentMemory.id.desc(),
         )
         .all()
+    )
+
+    unique_memories = {}
+
+    for memory in memories:
+        if memory.memory_key not in unique_memories:
+            unique_memories[
+                memory.memory_key
+            ] = memory
+
+    return list(
+        unique_memories.values()
     )
 
 
@@ -136,17 +154,31 @@ def delete_memory(
         .filter(
             AgentMemory.id
             == memory_id,
-            AgentMemory.workspace_id
-            == workspace_id,
         )
         .first()
     )
 
-    if memory is None:
+    if (
+        memory is None
+        or (
+            memory.memory_scope
+            == "workspace"
+            and memory.workspace_id
+            != workspace_id
+        )
+    ):
         return False
 
-    db.delete(memory)
+    if memory.memory_scope == "user":
+        return delete_memory_by_key(
+            db=db,
+            workspace_id=workspace_id,
+            memory_scope="user",
+            memory_key=memory.memory_key,
+            user_id=memory.user_id,
+        )
 
+    db.delete(memory)
     db.commit()
 
     return True
@@ -159,22 +191,36 @@ def delete_memory_by_key(
     memory_key: str,
     user_id: Optional[str] = None,
 ) -> bool:
-    memory = get_memory_by_key(
-        db=db,
-        workspace_id=workspace_id,
-        memory_scope=memory_scope,
-        memory_key=memory_key,
-        user_id=user_id,
+    query = (
+        db.query(AgentMemory)
+        .filter(
+            AgentMemory.memory_scope
+            == memory_scope,
+            AgentMemory.memory_key
+            == memory_key,
+        )
     )
 
-    if memory is None:
-        return False
+    if memory_scope == "user":
+        query = query.filter(
+            AgentMemory.user_id
+            == user_id
+        )
+    else:
+        query = query.filter(
+            AgentMemory.workspace_id
+            == workspace_id,
+            AgentMemory.user_id.is_(None),
+        )
 
-    db.delete(memory)
+    deleted = query.delete(
+        synchronize_session=False
+    )
 
-    db.commit()
+    if deleted:
+        db.commit()
 
-    return True
+    return bool(deleted)
 
 
 def load_memory_context(

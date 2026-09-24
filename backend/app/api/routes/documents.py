@@ -33,6 +33,13 @@ from backend.app.schemas.document import (
     DocumentProcessingResponse,
     DocumentResponse,
 )
+from backend.app.services import (
+    document_action_service,
+)
+from backend.app.services.document_action_service import (
+    DocumentBusyError,
+    DocumentNotFoundError,
+)
 from backend.app.services.task_dispatcher import (
     DocumentAlreadyProcessingError,
     TaskDispatchError,
@@ -446,68 +453,30 @@ def list_document_chunks(
 def delete_document(
     workspace_id: int,
     document_id: int,
-    db: Session = Depends(
-        get_db
-    ),
 ):
-    document = (
-        get_document_or_404(
-            db=db,
+    try:
+        document_action_service.delete_document(
             workspace_id=workspace_id,
             document_id=document_id,
         )
-    )
 
-    if document.processing_status in {
-        (
-            DocumentProcessingStatus
-            .QUEUED
-            .value
-        ),
-        (
-            DocumentProcessingStatus
-            .PROCESSING
-            .value
-        ),
-    }:
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=str(exc),
+        ) from exc
+
+    except DocumentBusyError as exc:
         raise HTTPException(
             status_code=(
                 status.HTTP_409_CONFLICT
             ),
-            detail=(
-                "Document cannot be "
-                "deleted while it is "
-                "queued or processing"
-            ),
-        )
-
-    file_path = Path(
-        document.file_path
-    )
-
-    try:
-        (
-            db.query(
-                DocumentChunk
-            )
-            .filter(
-                DocumentChunk.document_id
-                == document.id
-            )
-            .delete(
-                synchronize_session=False
-            )
-        )
-
-        db.delete(
-            document
-        )
-
-        db.commit()
+            detail=str(exc),
+        ) from exc
 
     except Exception as exc:
-        db.rollback()
-
         raise HTTPException(
             status_code=(
                 status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -517,13 +486,6 @@ def delete_document(
                 "document"
             ),
         ) from exc
-
-    try:
-        if file_path.exists():
-            file_path.unlink()
-
-    except OSError:
-        pass
 
     return Response(
         status_code=(

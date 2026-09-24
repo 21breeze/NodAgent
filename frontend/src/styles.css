@@ -119,6 +119,8 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .send-button:hover { background: #24569c; }
 .composer-footer { display: flex; justify-content: space-between; gap: 12px; margin: 9px 12px 0; color: #9da6b1; font-size: 10px; }
 .composer-note { margin: 0 0 8px 10px; color: #a66f29; font-size: 12px; }
+.delete-icon { color: #aa6262; }
+.delete-icon:hover:not(:disabled) { color: #b83d3d; background: #fff0f0; }
 .suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 26px; }
 .suggestions button { display: flex; align-items: center; gap: 14px; min-height: 37px; padding: 0 13px; border: 1px solid #e2e8f0; border-radius: 20px; background: #ffffffcf; color: #596573; font-size: 11px; }
 .suggestions button:hover { border-color: #9fc1f6; background: #fff; color: #2967c2; }
