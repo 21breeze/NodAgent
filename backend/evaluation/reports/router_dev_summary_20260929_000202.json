@@ -1,0 +1,114 @@
+{
+  "split": "dev",
+  "total": 60,
+  "correct": 60,
+  "wrong": 0,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "per_class": {
+    "direct": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "knowledge": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "document": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "memory": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "external": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "delete_document": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "confusion_matrix": {
+    "direct": {
+      "direct": 10,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 0
+    },
+    "knowledge": {
+      "direct": 0,
+      "knowledge": 10,
+      "document": 0,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 0
+    },
+    "document": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 10,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 0
+    },
+    "memory": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 10,
+      "external": 0,
+      "delete_document": 0
+    },
+    "external": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 0,
+      "external": 10,
+      "delete_document": 0
+    },
+    "delete_document": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 10
+    }
+  }
+}

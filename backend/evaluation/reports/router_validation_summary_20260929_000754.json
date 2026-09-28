@@ -1,0 +1,114 @@
+{
+  "evaluation_split": "validation",
+  "total": 60,
+  "correct": 59,
+  "wrong": 1,
+  "accuracy": 0.9833333333333333,
+  "macro_f1": 0.9832915622389308,
+  "per_class": {
+    "direct": {
+      "precision": 1.0,
+      "recall": 0.9,
+      "f1": 0.9473684210526316,
+      "support": 10,
+      "tp": 9,
+      "fp": 0,
+      "fn": 1
+    },
+    "knowledge": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "document": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "memory": {
+      "precision": 0.9090909090909091,
+      "recall": 1.0,
+      "f1": 0.9523809523809523,
+      "support": 10,
+      "tp": 10,
+      "fp": 1,
+      "fn": 0
+    },
+    "external": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    },
+    "delete_document": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 10,
+      "tp": 10,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "confusion_matrix": {
+    "direct": {
+      "direct": 9,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 1,
+      "external": 0,
+      "delete_document": 0
+    },
+    "knowledge": {
+      "direct": 0,
+      "knowledge": 10,
+      "document": 0,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 0
+    },
+    "document": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 10,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 0
+    },
+    "memory": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 10,
+      "external": 0,
+      "delete_document": 0
+    },
+    "external": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 0,
+      "external": 10,
+      "delete_document": 0
+    },
+    "delete_document": {
+      "direct": 0,
+      "knowledge": 0,
+      "document": 0,
+      "memory": 0,
+      "external": 0,
+      "delete_document": 10
+    }
+  }
+}
