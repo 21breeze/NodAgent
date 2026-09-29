@@ -49,3 +49,7 @@ logs/
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
+
+# RAG evaluation generated embeddings
+backend/evaluation/rag/cache/
+backend/evaluation/rag/datasets/scifact/

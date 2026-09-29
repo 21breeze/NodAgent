@@ -1,0 +1,26 @@
+{
+  "dataset": "BEIR SciFact",
+  "corpus_size": 5183,
+  "test_queries": 300,
+  "top_k": 5,
+  "candidate_k": 25,
+  "rrf_k": 60,
+  "embedding_model": "qwen3-embedding:4b",
+  "results": {
+    "vector": {
+      "Hit@5": 0.8,
+      "Recall@5": 0.7839444444444444,
+      "MRR@5": 0.6814444444444444
+    },
+    "keyword": {
+      "Hit@5": 0.013333333333333334,
+      "Recall@5": 0.013333333333333334,
+      "MRR@5": 0.013333333333333334
+    },
+    "hybrid": {
+      "Hit@5": 0.8033333333333333,
+      "Recall@5": 0.7872777777777777,
+      "MRR@5": 0.6847777777777777
+    }
+  }
+}
